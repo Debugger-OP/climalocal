@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+requests
+prophet
+scikit-learn
+plotly
+google-genai
+fpdf2
