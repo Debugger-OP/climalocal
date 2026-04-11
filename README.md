@@ -12,7 +12,7 @@
 
 ## 🚀 Live Demo
 
-[[[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://climalocal.streamlit.app)https://climalocal-sauravsharma.streamlit.app/](https://climalocal-sauravsharma.streamlit.app/)](https://climalocal-sauravsharma.streamlit.app/)
+[[[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://climalocal.streamlit.app)https://climalocal-sauravsharma.streamlit.app/]
 
 ---
 
