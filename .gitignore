@@ -1,8 +1,6 @@
 # Virtual environment
 venv/
 
-# API Keys — never commit these
-llm_engine.py
 
 # Downloaded data
 data/
