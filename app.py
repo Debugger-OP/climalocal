@@ -5,12 +5,12 @@ from ml_models import get_city_forecast, extract_forecast_stats, get_current_sta
 from carbon_profiler import calculate_carbon_footprint, get_benchmark, get_footprint_rating
 import pandas as pd
 from llm_engine import generate_climate_narrative
+from carbon_profiler import calculate_carbon_footprint, get_benchmark, get_footprint_rating, get_balance_actions
 import os
 
 # ── Page Config ─────────────────────────────────────────────
 st.set_page_config(
     page_title="ClimaLocal",
-    page_icon="🌍",
     layout="wide"
 )
 
@@ -51,53 +51,83 @@ st.divider()
 
 # ── Sidebar ──────────────────────────────────────────────────
 with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/7/70/Sustainable_Development_Goal_13.png/1280px-Sustainable_Development_Goal_13.png?_=20180106212953", width=120)
-    st.markdown("### ⚙️ Your Profile")
+    st.markdown("""
+    <div style="background: #1A5276; color: white; padding: 0.6rem 1rem; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 1rem;">
+         SDG 13 · Climate Action
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("### Your Profile")
 
-    city = st.selectbox("🏙️ Select Your City", list(CITIES.keys()))
+    city = st.selectbox("Select Your City", list(CITIES.keys()))
 
-    st.markdown("#### 🚗 Transport")
+    st.markdown("#### Transport")
     transport_mode = st.selectbox("Mode of Transport", [
-        "car_petrol", "car_diesel",
-        "car_ev", "bike_ev", "scooter_ev",
-        "bike_petrol",
-        "auto", "bus", "bus_ev", "metro_train",
-        "cycle", "work_from_home"
+        "car_petrol", "car_diesel", "car_ev",
+        "bike_petrol", "bike_ev", "scooter_ev",
+        "carpool_petrol", "carpool_ev", "shared_auto",
+        "hitchhiking", "auto", "bus", "bus_ev",
+        "metro_train", "cycle", "work_from_home","walk"
     ])
     daily_km = st.slider("Daily Distance (km)", 1, 100, 15)
 
-    st.markdown("#### 🍽️ Diet")
+    st.markdown("#### Cooking")
+    cooking_mode = st.selectbox("Cooking Fuel", [
+        "lpg", "png", "induction", "biogas",
+        "solar_cooking", "kerosene", "wood", "coal"
+    ])
+
+    st.markdown("#### Diet")
     diet_type = st.selectbox("Diet Type", [
         "vegan", "vegetarian", "mostly_veg",
         "moderate_non_veg", "heavy_non_veg"
     ])
 
+    # Dynamic food sub-options based on diet
+    if diet_type == "vegan":
+        food_options = ["dal_rice", "sabzi_roti", "fruits_salad", "poha_upma"]
+    elif diet_type == "vegetarian" or diet_type == "mostly_veg":
+        food_options = ["dal_rice", "sabzi_roti", "poha_upma", "paneer_dish", "milk_curd_daily", "cheese_butter",]
+    else:
+        food_options = ["dal_rice", "sabzi_roti", "paneer_dish", "milk_curd_daily", "chicken_weekly", "mutton_weekly", "fish_weekly","egg_daily"]
+
+    food_items = st.multiselect("Common Food Items (select all that apply)", food_options)
+
     st.markdown("#### ⚡ Energy")
     electricity_bill = st.slider("Monthly Electricity Bill (₹)", 100, 5000, 800)
 
-    st.markdown("#### 🛍️ Shopping")
+    st.markdown("#### Shopping")
     shopping_habit = st.selectbox("Shopping Habit", [
         "minimal", "moderate", "frequent", "heavy"
     ])
 
-    generate_btn = st.button("🔍 Generate My Climate Report", type="primary", use_container_width=True)
+    st.markdown("#### Conservation")
+    trees_planted = st.number_input("Trees Planted (per year)", min_value=0, max_value=500, value=0)
+    conservation_actions = st.multiselect("Conservation Actions", [
+        "rainwater_harvesting", "solar_panels",
+        "composting", "reduced_ac_use", "led_lights_only"
+    ])
 
+    generate_btn = st.button("Generate My Climate Report", type="primary", use_container_width=True)
 # ── Main Content ─────────────────────────────────────────────
 if generate_btn:
 
     user_inputs = {
         "transport_mode": transport_mode,
         "daily_km": daily_km,
+        "cooking_mode": cooking_mode,
         "diet_type": diet_type,
+        "food_items": food_items,
         "monthly_electricity_bill": electricity_bill,
         "shopping_habit": shopping_habit,
+        "trees_planted": trees_planted,
+        "conservation_actions": conservation_actions,
     }
 
     # ── Step 1: Load & forecast climate data
-    with st.spinner(f"📡 Fetching climate data for {city}..."):
+    with st.spinner(f"Fetching climate data for {city}..."):
         df = load_climate_data(city)
 
-    with st.spinner("🤖 Training forecast models (this takes ~1 min)..."):
+    with st.spinner("Training forecast models (this takes ~1 min)..."):
         forecasts = get_city_forecast(city)
         current_stats = get_current_stats(city)
         future_stats  = extract_forecast_stats(forecasts, target_year=2040)
@@ -111,12 +141,13 @@ if generate_btn:
     )
 
     # ── Step 3: Carbon footprint
-    carbon_total, carbon_breakdown = calculate_carbon_footprint(user_inputs)
+    gross_total, carbon_total, carbon_breakdown, carbon_offsets = calculate_carbon_footprint(user_inputs)
     rating, rating_msg = get_footprint_rating(carbon_total)
-    benchmarks = get_benchmark()
+    benchmarks = get_benchmark() 
+    balance_actions = get_balance_actions(carbon_total, trees_planted)
 
     # ── Step 4: LLM Narrative
-    with st.spinner("✍️ Generating your personalized climate narrative..."):
+    with st.spinner("Generating your personalized climate narrative..."):
         narrative = generate_climate_narrative(
             city_name=city,
             current_stats=current_stats,
@@ -127,64 +158,11 @@ if generate_btn:
             user_inputs=user_inputs
         )
 
-    # ════════════════════════════════════════════════
-    # SECTION 1: City Climate Overview
-    # ════════════════════════════════════════════════
-    st.markdown("## 🌡️ Climate Overview")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Avg Temperature 2040", f"{future_stats['temperature']}°C",
-                  delta=f"{round(future_stats['temperature'] - current_stats['temperature'], 2)}°C vs today")
-    with col2:
-        st.metric("Avg Rainfall 2040", f"{future_stats['rainfall']} mm/day",
-                  delta=f"{round(future_stats['rainfall'] - current_stats['rainfall'], 2)} mm vs today")
-    with col3:
-        st.metric("Avg Humidity 2040", f"{future_stats['humidity']}%",
-                  delta=f"{round(future_stats['humidity'] - current_stats['humidity'], 2)}% vs today")
-
-    # Risk badge
-    risk_class = {"High": "risk-high", "Medium": "risk-medium", "Low": "risk-low"}.get(risk_level, "risk-low")
-    risk_emoji = {"High": "🔴", "Medium": "🟠", "Low": "🟢"}.get(risk_level, "🟢")
-    st.markdown(f'<div class="{risk_class}"><b>{risk_emoji} Climate Risk Level: {risk_level}</b><br>{narrative["summary"]}</div>', unsafe_allow_html=True)
-
-    st.divider()
 
     # ════════════════════════════════════════════════
-    # SECTION 2: Temperature Forecast Chart
+    # SECTION 1: Carbon Footprint
     # ════════════════════════════════════════════════
-    st.markdown("## 📈 Temperature Forecast (2000–2040)")
-
-    temp_forecast = forecasts["temperature"]
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=temp_forecast["ds"], y=temp_forecast["yhat"],
-        name="Forecast", line=dict(color="#E74C3C", width=2)
-    ))
-    fig.add_trace(go.Scatter(
-        x=temp_forecast["ds"], y=temp_forecast["yhat_upper"],
-        fill=None, line=dict(color="rgba(231,76,60,0.2)"), showlegend=False
-    ))
-    fig.add_trace(go.Scatter(
-        x=temp_forecast["ds"], y=temp_forecast["yhat_lower"],
-        fill="tonexty", line=dict(color="rgba(231,76,60,0.2)"),
-        name="Confidence Range"
-    ))
-    fig.add_vline(x=pd.Timestamp("2026-01-01").timestamp() * 1000,
-            line_dash="dash", line_color="gray",
-            annotation_text="Today")
-    fig.update_layout(
-        xaxis_title="Year", yaxis_title="Temperature (°C)",
-        plot_bgcolor="#f9f9f9", height=400
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.divider()
-
-    # ════════════════════════════════════════════════
-    # SECTION 3: Carbon Footprint
-    # ════════════════════════════════════════════════
-    st.markdown("## 💨 Your Carbon Footprint")
+    st.markdown("## Your Carbon Footprint")
 
     col1, col2 = st.columns([1, 1])
 
@@ -218,34 +196,128 @@ if generate_btn:
         st.plotly_chart(fig3, use_container_width=True)
 
     st.markdown(f"**Personal Impact:** {narrative['impact']}")
+    # Offset summary
+    st.markdown("#### Your Offsets")
+    oc1, oc2, oc3 = st.columns(3)
+    with oc1:
+        st.metric("Gross Footprint", f"{gross_total} t CO₂")
+    with oc2:
+        st.metric("Total Offset", f"-{carbon_offsets['Total Offset']} t CO₂")
+    with oc3:
+        st.metric("Net Footprint", f"{carbon_total} t CO₂")
 
+    st.markdown("#### ⚖️ To Balance Your Remaining Footprint")
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        st.info(f"🌳 {balance_actions['trees_message']}")
+    with b2:
+        st.info(f"☀️ Use solar panels for **{balance_actions['solar_months']} months**")
+    with b3:
+        st.info(f"🚗 Avoid **{balance_actions['car_km_to_avoid']:,} km** of petrol car travel")
+        
     st.divider()
 
     # ════════════════════════════════════════════════
-    # SECTION 4: Action Plan
+    # SECTION 2: Action Plan
     # ════════════════════════════════════════════════
-    st.markdown("## ✅ Your Personal Action Plan")
+    st.markdown("## Your Personal Action Plan")
     for i, action in enumerate(narrative["actions"], 1):
         st.markdown(f"**{i}.** {action}")
 
     st.divider()
 
+
+    # ════════════════════════════════════════════════
+    # SECTION 3: City Climate Overview
+    # ════════════════════════════════════════════════
+    st.markdown("## Climate Overview")
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Avg Temperature 2040", f"{future_stats['temperature']}°C",
+                  delta=f"{round(future_stats['temperature'] - current_stats['temperature'], 2)}°C vs today")
+    with col2:
+        st.metric("Avg Rainfall 2040", f"{future_stats['rainfall']} mm/day",
+                  delta=f"{round(future_stats['rainfall'] - current_stats['rainfall'], 2)} mm vs today")
+    with col3:
+        st.metric("Avg Humidity 2040", f"{future_stats['humidity']}%",
+                  delta=f"{round(future_stats['humidity'] - current_stats['humidity'], 2)}% vs today")
+    with col4:
+        rainfall_change = round(future_stats['rainfall'] - current_stats['rainfall'], 2)
+        water_stress = "🔴 High" if future_stats['rainfall'] < 1.5 else "🟠 Moderate" if future_stats['rainfall'] < 2.5 else "🟢 Low"
+        st.metric("Water Stress 2040", water_stress, delta=f"{rainfall_change} mm/day rainfall shift")
+
+    # Water metrics
+    st.markdown("#### Water Resource Outlook")
+    wc1, wc2, wc3 = st.columns(3)
+    rainfall_pct_change = round(((future_stats['rainfall'] - current_stats['rainfall']) / current_stats['rainfall']) * 100, 1)
+    with wc1:
+        st.metric("Rainfall Change by 2040", f"{rainfall_pct_change}%",
+                  delta="vs current levels")
+    with wc2:
+        groundwater_depletion = round(abs(rainfall_pct_change) * 0.6, 1)
+        st.metric("Est. Groundwater Depletion", f"{groundwater_depletion}%",
+                  delta="projected reduction in reserves")
+    with wc3:
+        water_availability = round(future_stats['rainfall'] * 365 * 0.3, 1)
+        st.metric("Est. Water Availability 2040", f"{water_availability} mm/yr",
+                  delta="usable surface water estimate")
+
+    # Risk badge
+    risk_class = {"High": "risk-high", "Medium": "risk-medium", "Low": "risk-low"}.get(risk_level, "risk-low")
+    risk_emoji = {"High": "🔴", "Medium": "🟠", "Low": "🟢"}.get(risk_level, "🟢")
+    st.markdown(f'<div class="{risk_class}"><b>{risk_emoji} Climate Risk Level: {risk_level}</b><br>{narrative["summary"]}</div>', unsafe_allow_html=True)
+
+    st.divider()
+
+    # ════════════════════════════════════════════════
+    # SECTION 4: Temperature Forecast Chart
+    # ════════════════════════════════════════════════
+    st.markdown("## Temperature Forecast (2000–2040)")
+
+    temp_forecast = forecasts["temperature"]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=temp_forecast["ds"], y=temp_forecast["yhat"],
+        name="Forecast", line=dict(color="#E74C3C", width=2)
+    ))
+    fig.add_trace(go.Scatter(
+        x=temp_forecast["ds"], y=temp_forecast["yhat_upper"],
+        fill=None, line=dict(color="rgba(231,76,60,0.2)"), showlegend=False
+    ))
+    fig.add_trace(go.Scatter(
+        x=temp_forecast["ds"], y=temp_forecast["yhat_lower"],
+        fill="tonexty", line=dict(color="rgba(231,76,60,0.2)"),
+        name="Confidence Range"
+    ))
+    fig.add_vline(x=pd.Timestamp("2026-01-01").timestamp() * 1000,
+            line_dash="dash", line_color="gray",
+            annotation_text="Today")
+    fig.update_layout(
+        xaxis_title="Year", yaxis_title="Temperature (°C)",
+        plot_bgcolor="#f9f9f9", height=400
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    
     # ════════════════════════════════════════════════
     # SECTION 5: Letter from 2040
     # ════════════════════════════════════════════════
-    st.markdown("## 💌 A Letter From Your 2040 Self")
+    st.markdown("## A Letter From Your 2040 Self")
     st.markdown(f'<div class="letter-box">{narrative["letter"]}</div>', unsafe_allow_html=True)
 
 else:
     # Landing state
-    st.markdown("### 👈 Select your city and lifestyle from the sidebar, then click Generate!")
+    st.markdown("### Select your city and lifestyle from the sidebar, then click Generate!")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.info("📡 **Real Climate Data**\nPulled from NASA POWER API for your exact city")
+        st.info("**Real Climate Data**\nPulled from NASA POWER API for your exact city")
     with col2:
-        st.info("🤖 **ML Forecasting**\nProphet model predicts your city's climate up to 2040")
+        st.info("**ML Forecasting**\nProphet model predicts your city's climate up to 2040")
     with col3:
-        st.info("💌 **Letter from 2040**\nAI writes your personal climate future story")
+        st.info("**Letter from 2040**\nAI writes your personal climate future story")
 
 # ── Footer ───────────────────────────────────────────────────
 st.markdown("""
@@ -266,7 +338,7 @@ st.markdown("""
 </style>
 <div class="footer">
     Built with 💚 & questionable sleep schedules by <b style="color: #2E8B57;">Saurav Sharma</b> · 
-    Powered by NASA data, real ML & one very real fear of Gurgaon's summers in 2040 ☀️🥵 · 
+    Powered by NASA data, real ML & one very real fear of Gurgaon's summers in 2040 · 
     <i>I don't bite — unless you're a bug 🐛 in my pipeline</i>
 </div>
 """, unsafe_allow_html=True)

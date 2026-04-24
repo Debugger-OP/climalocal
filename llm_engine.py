@@ -4,7 +4,7 @@ import re
 import os   
 
 # ── Paste your Gemini API key here ──────────────────────────
-API_KEY = os.environ.get("GEMINI_API_KEY", "your-key-here")
+API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyD5OY5UmY4WgqndbBRT4fQcBD7VsvvBmNs")
 
 client = genai.Client(api_key=API_KEY)
 
@@ -41,7 +41,7 @@ Climate Risk Level: {risk_level}
 Total: {carbon_total} tonnes CO2/year
 Breakdown:
 - Transport: {carbon_breakdown['Transport']} tonnes
-- Diet: {carbon_breakdown['Diet']} tonnes
+- Diet & Food: {carbon_breakdown['Diet & Food']} tonnes
 - Electricity: {carbon_breakdown['Electricity']} tonnes
 - Shopping: {carbon_breakdown['Shopping']} tonnes
 
