@@ -4,7 +4,7 @@ import re
 import os   
 
 # ── Paste your Gemini API key here ──────────────────────────
-API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyD5OY5UmY4WgqndbBRT4fQcBD7VsvvBmNs")
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 client = genai.Client(api_key=API_KEY)
 
