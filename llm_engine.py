@@ -2,10 +2,13 @@ from google import genai
 import json
 import re
 import os   
+import streamlit as st
+from google import genai
+
+
 
 # ── Paste your Gemini API key here ──────────────────────────
-API_KEY = os.environ.get("GEMINI_API_KEY", "")
-
+API_KEY = st.secrets["GEMINI_API_KEY"]
 client = genai.Client(api_key=API_KEY)
 
 
